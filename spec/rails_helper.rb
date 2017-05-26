@@ -64,7 +64,7 @@ Shoulda::Matchers.configure do |config|
   end
 end
 
-RSpec.configuration do |config|
+RSpec.configure do |config|
   config.include FactoryGirl::Syntax::Methods
 
   config.before(:suite) do
