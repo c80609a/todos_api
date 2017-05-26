@@ -50,7 +50,7 @@ guard 'zeus' do
       #rspec.spec.call("routing/#{m[1]}_routing"),
       rspec.spec.call("controllers/#{m[1]}_controller"),
       #rspec.spec.call("acceptance/#{m[1]}")
-      rspec.spec.call('requests/#{m[1]}')
+      rspec.spec.call("requests/#{m[1]}")
     ]
   end
 
