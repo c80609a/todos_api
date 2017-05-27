@@ -9,6 +9,9 @@ class TodosController < ApplicationController
 
   # POST /todos
   def create
+    # используем `create!` вместо `create`, что может вызвать
+    # ActiveRecord::RecordInvalid. А при наличии `exception_handler.rb`
+    # не надо лабать вложенные if..else здесь, в контроллере.
     @todo = Todo.create!(todo_params)
     json_response(@todo, :created)
   end
