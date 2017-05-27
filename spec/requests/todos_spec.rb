@@ -3,6 +3,7 @@ require 'rails_helper'
 RSpec.describe 'Todos API', type: :request do
   
   # инициализируем тестовые данные
+  # noinspection RubyResolve
   let!(:todos) { create_list(:todo, 10) }
   let(:todo_id) { todos.first.id }
 
@@ -14,7 +15,8 @@ RSpec.describe 'Todos API', type: :request do
 
     it 'вернёт списки всех дел' do
       # NOTE:: `json` это custom helper, который помогает парсить JSON ответы
-      
+
+      # noinspection RubyResolve
       expect(json).not_to be_empty
       expect(json.size).to eq(10)
 
@@ -30,11 +32,12 @@ RSpec.describe 'Todos API', type: :request do
   # лабаем test suit для GET /todos/:id
   describe 'GET /todos/:id' do
     
-    before { get '/todos/#{todo_id}' }
+    before { get "/todos/#{todo_id}"}
 
     context 'Если запись существует:' do
       
       it 'вернёт указанный список дел' do
+        # noinspection RubyResolve
         expect(json).to_not be_empty
 	expect(json['id']).to eq todo_id
       end
@@ -92,8 +95,8 @@ RSpec.describe 'Todos API', type: :request do
         expect(response).to have_http_status(422)
       end
 
-      it 'вернёт сообщение о невалидном запросe' do
-        expect(response.body).to match(/Validation failed: 'created_by' can't be blank/)
+      it 'вернёт сообщение о невалидном запросе' do
+        expect(response.body).to match(/Validation failed: Created by can't be blank/)
       end
 
     end#context
@@ -107,10 +110,11 @@ RSpec.describe 'Todos API', type: :request do
     end
 
     context 'Если запись существует:' do
-      before { put '/todos/#{todo_id}', params: valid_attributes }
+      before { put "/todos/#{todo_id}", params: valid_attributes }
       
       it 'атрибуты существующей записи обновятся' do
-        expect(response.body).not_to be_empty
+        # noinspection RubyResolve
+        expect(response.body).to be_empty
       end
 
       it 'вернёт статус 204' do
@@ -121,8 +125,8 @@ RSpec.describe 'Todos API', type: :request do
 
   end#describe
 
-  describe 'DELETE /todo/:id' do
-    before { delete '/todo/#{todo_id}' }
+  describe 'DELETE /todos/:id' do
+    before { delete "/todos/#{todo_id}"}
 
     it 'вернёт статус 204' do
       expect(response).to have_http_status(204)
