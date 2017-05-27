@@ -4,8 +4,8 @@
 
 Оригинал (by https://github.com/akabiru):
 
-https://scotch.io/tutorials/build-a-restful-json-api-with-rails-5-part-one
-https://scotch.io/tutorials/build-a-restful-json-api-with-rails-5-part-two
+* https://scotch.io/tutorials/build-a-restful-json-api-with-rails-5-part-one
+* https://scotch.io/tutorials/build-a-restful-json-api-with-rails-5-part-two
 
 # Intro
 
@@ -17,7 +17,7 @@ https://scotch.io/tutorials/build-a-restful-json-api-with-rails-5-part-two
 
 # Prerequisites
 
-```
+```bash
 $ ruby -v # ruby 2.3.1
 $ rails -v # Rails 5.0.1
 ```
@@ -42,14 +42,13 @@ API приложения, в конечном итоге, будет испов�
 
 # Project Setup
 
-```
+```bash
 $ rails new todos-api --api -T
 ```
 
 Добавляем gems в `Gemfile`:
 
-```
-
+```ruby
 group :development, :test do
   gem 'rspec-rails', '~> 3.5'
 end
@@ -65,7 +64,7 @@ end
 
 Далее:
 
-```
+```bash
 $ bundle install
 $ rails g rspec:install
 $ mkdir spec/factories
@@ -122,7 +121,7 @@ Git log:
 
 Генерим модели:
 
-```
+```bash
 $ rails g model Todo title:string created_by:string
 $ rails g model Item name:string done:boolean todo:references
 $ rails db:migrate
@@ -147,7 +146,7 @@ ef55bc9: [2017-05-26 06:51:43 +0300] подключил и настроил Guar
 
 Добавляем контроллеры:
 
-```
+```bash
 $ rails g controller Todos
 $ rails g controller Items
 ```
@@ -157,7 +156,7 @@ $ rails g controller Items
 
 > According to RSpec, the official recommendation of the Rails team and the RSpec core team is to write request specs instead.
 
-```
+```bash
 $ mkdir spec/requests && touch spec/requests/{todos_spec.rb,items_spec.rb}
 $ touch spec/factories/{todos.rb,items.rb}
 ```
@@ -166,7 +165,7 @@ $ touch spec/factories/{todos.rb,items.rb}
 
 * `spec/factories/todos.rb`:
 
-```
+```ruby
 FactoryGirl.define do
   factory :todo do
     title { Faker::Lorem.word }
@@ -177,7 +176,7 @@ end
 
 * `spec/factories/items.rb`:
 
-```
+```ruby
 FactoryGirl.define do
   factory :item do
     name { Faker::StarWars.character }
@@ -191,13 +190,13 @@ end
 
 Добавляем `spec/support`:
 
-```
+```bash
 $ mkdir spec/support && touch spec/support/request_spec_helper.rb
 ```
 
 С содержимым:
 
-```
+```ruby
 module RequestSpecHelper
   # Parse JSON response to ruby hash
   def json
@@ -208,7 +207,7 @@ end
 
 Чтобы этот файл require, включаем его в `rails_helper.rb`:
 
-```
+```ruby
 # [...]
 Dir[Rails.root.join('spec/support/**/*.rb')].each { |f| require f }
 # [...]
@@ -233,7 +232,7 @@ ae68a3c: [2017-05-26 06:57:03 +0300] $ rails g controller Todos
 
 Определяем маршруты в `routes.rb`:
 
-```
+```ruby
 Rails.application.routes.draw do
   resources :todos do
     resources :items
@@ -258,7 +257,7 @@ a7912c9: [2017-05-26 21:24:56 +0300] реализовал методы todos_con
 
 * `json_responce` - этот хелпер отдаёт JSON и HTTP код. Определяем его в `app/controllers/concerns/response.rb`:
 
-```
+```ruby
 module Response
   def json_response(object, status = :ok)
     render json: object, status: status
@@ -278,7 +277,7 @@ end
  
  Добавим concern-модули в `application_controller.rb`:
  
-```
+```ruby
 class ApplicationController < ActionController::API
   include Response
   include ExceptionHandler
@@ -296,7 +295,7 @@ Git log:
 
 Запустим сервер for some good old manual testing - `$ rails s` - и совершим пару запросов:
 
-```
+```bash
 $ curl -X POST localhost:3000/todos
 # пусто
 
