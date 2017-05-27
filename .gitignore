@@ -21,3 +21,4 @@
 .log
 *.pid
 *.swp
+/.idea/
