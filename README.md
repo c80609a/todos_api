@@ -7,7 +7,32 @@
 * https://scotch.io/tutorials/build-a-restful-json-api-with-rails-5-part-one
 * https://scotch.io/tutorials/build-a-restful-json-api-with-rails-5-part-two
 
-# Intro
+# Содержание
+
+<ul>
+ <li>1. Part 1
+   <ul>
+       <li>1.1. Intro</li>
+       <li>1.2. Prerequisites</li>
+       <li>1.3. API Endpoints</li>
+       <li>1.4. Project Setup</li>
+       <li>1.5. Configuration</li>
+       <li>1.6. Models</li>
+       <li>1.7. Controllers
+         <ul>
+             <li>1.7.1 Generate</li>
+             <li>1.7.2 Fabrics</li>
+             <li>1.7.3 Todo API</li>
+             <li>1.7.4 Todo items API</li>
+         </ul>
+       </li>
+   </ul>
+ </li> 
+</ul>
+
+# Part 1
+
+## Intro
 
 Согласно [Rails 5 release notes](http://guides.rubyonrails.org/5_0_release_notes.html), генерация API only приложения:
 
@@ -15,14 +40,14 @@
 * создаст `ApplicationController`, унаследовав его от `ActionController::API`, а не от `ActionController::Base`
 * не будет генерить view файлы
 
-# Prerequisites
+## Prerequisites
 
 ```bash
 $ ruby -v # ruby 2.3.1
 $ rails -v # Rails 5.0.1
 ```
 
-# API Endpoints
+## API Endpoints
 
 API приложения, в конечном итоге, будет исповедовать REST архитектуру:
 
@@ -40,7 +65,7 @@ API приложения, в конечном итоге, будет испов�
 | `PUT /todos/:id/items`	|  Update a todo item          |
 | `DELETE /todos/:id/items` |	 Delete a todo item        |
 
-# Project Setup
+## Project Setup
 
 ```bash
 $ rails new todos-api --api -T
@@ -117,7 +142,7 @@ Git log:
 630ffe2: [2017-05-26 05:01:35 +0300] $ rails new todos_api --api -T
 ```
 
-# Models
+## Models
 
 Генерим модели:
 
@@ -142,7 +167,9 @@ ef55bc9: [2017-05-26 06:51:43 +0300] подключил и настроил Guar
 796a5af: [2017-05-26 06:14:41 +0300] добавил модели Todo и Item
 ```
 
-# Controllers
+## Controllers
+
+### Generate
 
 Добавляем контроллеры:
 
@@ -158,10 +185,13 @@ $ rails g controller Items
 
 ```bash
 $ mkdir spec/requests && touch spec/requests/{todos_spec.rb,items_spec.rb}
-$ touch spec/factories/{todos.rb,items.rb}
 ```
 
+### Fabrics
+
 Лабаем фабрики (factories):
+
+* `$ touch spec/factories/{todos.rb,items.rb}`
 
 * `spec/factories/todos.rb`:
 
@@ -185,6 +215,8 @@ FactoryGirl.define do
   end
 end
 ```
+
+### Todo API
 
 Затем пишем тесты для API: `spec/requests/todos_spec.rb`. Замечаем, что код использует некий метод `json` - это support.
 
@@ -243,7 +275,8 @@ end
 Здесь мы создали todo resource со вложенным item resource.
 This enforces the 1:m (один ко многим) на уровне маршрутизации.
 
-Запускаем тесты еще раз, наблюдаем, что ошибки маршрутизации исчезли, остались ошибки контроллера. Создаём методы контроллера `app/controllers/todos_controller.rb`.
+Запускаем тесты еще раз, наблюдаем, что ошибки маршрутизации исчезли, остались ошибки контроллера. 
+Создаём методы контроллера `app/controllers/todos_controller.rb`.
 
 Git log:
 
@@ -313,7 +346,47 @@ $ curl -X DELETE localhost:3000/todos/1
 
 ```
 
-## Todo items API
+### Todo items API
 
 Лабаем падающие тесты в `spec/requests/items_spec.rb`. 
-Коммит: 30b44e69c7085247cfbf4f09062264415eb6d346.
+Затем пишем код в контроллере `items_controller.rb`. Несколько замечаний
+про код в контроллере:
+
+* используются callbacks, внутри которых определяются переменные `@todo` и `@item`
+* причем, когда определяем `@item`:
+ * запись ищется среди дел `@todo` с помощью метода `find_by!`, который raise `ActiveRecord::RecordNotFound`, если запись не будет найдена (если бы использовали метод `find_by`, то он вернул бы `nil` в этом случае) 
+ * также используется условие `if @todo`
+* т.е. callback `set_todo_item` может либо вернуть `nil` (если нет данного списка дел), либо raise `ActiveRecord::RecordNotFound` (если нет среди дел данного списка искомого item-a)
+* используем метод `head` - который возвращает ответ без контента, только заголовки
+
+Прогоняем тесты ещё раз - все проходят.
+Запускаем сервер `rails s` и в отдельном терминале проверяем API вручную:
+
+```
+curl -X POST localhost:3000/todos -d 'title=Mozart&created_by=1'
+# {"id":1,"title":"Mozart","created_by":"1","created_at":"2017-05-28T11:25:18.295Z","updated_at":"2017-05-28T11:25:18.295Z"}
+
+curl -X POST localhost:3000/todos/1/items -d 'name=Listen 5th symphony&done=false'
+# [{"id":1,"name":"Listen 5th symphony","done":false,"todo_id":1,"created_at":"2017-05-28T11:27:49.946Z","updated_at":"2017-05-28T11:27:49.946Z"}]
+
+curl localhost:3000/todos/1/items
+# [{"id":1,"name":"Listen 5th symphony","done":false,"todo_id":1,"created_at":"2017-05-28T11:27:49.946Z","updated_at":"2017-05-28T11:27:49.946Z"}] 
+
+curl -X PATCH localhost:3000/todos/1/items/1 -d 'name=Work'
+# ничего
+
+curl localhost:3000/todos/1/items
+# [{"id":1,"name":"Work","done":false,"todo_id":1,"created_at":"2017-05-28T11:27:49.946Z","updated_at":"2017-05-28T11:28:36.807Z"}]
+
+curl -X PATCH localhost:3000/todos/1/items/1 -d 'done=true'
+# ничего 
+
+curl localhost:3000/todos/1/items
+# [{"id":1,"name":"Work","done":true,"todo_id":1,"created_at":"2017-05-28T11:27:49.946Z","updated_at":"2017-05-28T11:29:36.222Z"}]
+
+curl -X DELETE localhost:3000/todos/2/items/1
+# ничего
+
+curl localhost:3000/todos/2/items
+# []
+```
