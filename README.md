@@ -312,3 +312,7 @@ $ curl -X DELETE localhost:3000/todos/1
 
 
 ```
+
+## Todo items API
+
+Лабаем `spec/requests/items_spec.rb`. Коммит: 30b44e6.
