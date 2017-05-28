@@ -10,20 +10,20 @@
 # Содержание
 
 <ul>
- <li>1. Part 1
+ <li><a href='#part-1'>1. Part 1</a>
    <ul>
-       <li>1.1. Intro</li>
-       <li>1.2. Prerequisites</li>
-       <li>1.3. API Endpoints</li>
-       <li>1.4. Project Setup</li>
-       <li>1.5. Configuration</li>
-       <li>1.6. Models</li>
-       <li>1.7. Controllers
+       <li>1.1. <a href='#intro'>Intro</a></li>
+       <li>1.2. <a href='#prerequisites'>Prerequisites</a></li>
+       <li>1.3. <a href='#api-endpoints'>API Endpoints</a></li>
+       <li>1.4. <a href='#project-setup'>Project Setup</a></li>
+       <li>1.5. <a href='#configuration'>Configuration</a></li>
+       <li>1.6. <a href='#models'>Models</a></li>
+       <li>1.7. <a href='#controllers'>Controllers</a>
          <ul>
-             <li>1.7.1 Generate</li>
-             <li>1.7.2 Fabrics</li>
-             <li>1.7.3 Todo API</li>
-             <li>1.7.4 Todo items API</li>
+             <li>1.7.1 <a href='#generate'>Generate</a></li>
+             <li>1.7.2 <a href='#fabrics'>Fabrics</a></li>
+             <li>1.7.3 <a href='#todo-api'>Todo API</a></li>
+             <li>1.7.4 <a href='#todo-items-api'>Todo items API</a></li>
          </ul>
        </li>
    </ul>
