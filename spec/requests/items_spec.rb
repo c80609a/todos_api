@@ -19,7 +19,6 @@ RSpec.describe 'Items API' do
       end
 
       it 'должен вернуть список дел указанного todo' do
-        puts json
         expect(json.size).to eq(20)
       end
 
@@ -107,7 +106,7 @@ RSpec.describe 'Items API' do
     end
 
     before do
-      put "/todos/#{todo_id}/items/#{id}"
+      put "/todos/#{todo_id}/items/#{id}", :params => valid_attributes
     end
 
     context 'если дело (item) существует:' do
@@ -123,7 +122,7 @@ RSpec.describe 'Items API' do
 
     end
 
-    context 'если дело (item) несуществует:' do
+    context 'если дело (item) не существует:' do
       let(:id) { 10500 }
 
       it 'должен вернуть код 404' do
@@ -146,8 +145,8 @@ RSpec.describe 'Items API' do
 
     context 'если запись существует:' do
 
-      it 'должен вернуть код 200' do
-        expect(response).to have_http_status(200)
+      it 'должен вернуть код 204' do
+        expect(response).to have_http_status(204)
       end
 
       it 'запись должна быть удалена' do
