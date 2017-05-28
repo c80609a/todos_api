@@ -178,7 +178,8 @@ $ rails g controller Todos
 $ rails g controller Items
 ```
 
-Пишем тесты, но: мы не будем писать тесты для контроллеров. 
+Пишем тесты, но: мы не будем писать тесты для контроллеров.
+ 
 Мы будем писать тесты для [запросов (requests specs)](https://www.relishapp.com/rspec/rspec-rails/docs/request-specs/request-spec).
 
 > According to RSpec, the official recommendation of the Rails team and the RSpec core team is to write request specs instead.
@@ -218,7 +219,9 @@ end
 
 ### Todo API
 
-Затем пишем тесты для API: `spec/requests/todos_spec.rb`. Замечаем, что код использует некий метод `json` - это support.
+Затем пишем тесты для API: `spec/requests/todos_spec.rb`. 
+
+Замечаем, что код использует некий метод `json` - это support.
 
 Добавляем `spec/support`:
 
@@ -273,9 +276,11 @@ end
 ```
 
 Здесь мы создали todo resource со вложенным item resource.
+
 This enforces the 1:m (один ко многим) на уровне маршрутизации.
 
-Запускаем тесты еще раз, наблюдаем, что ошибки маршрутизации исчезли, остались ошибки контроллера. 
+Запускаем тесты еще раз, наблюдаем, что ошибки маршрутизации исчезли, остались ошибки контроллера.
+ 
 Создаём методы контроллера `app/controllers/todos_controller.rb`.
 
 Git log:
@@ -298,17 +303,14 @@ module Response
 end
 ```
 
-* `set_todo` - это приватный метод контроллера (callback method), который ищет todo by id.
- Если запись не будет найдена в базе, ActiveRecord will throw an exception `ActiveRecord::RecordNotFound`. 
- Мы защитимся от этой ошибки, вернув HTTP код `404`. 
- Для этого создадим модуль `app/controllers/concerns/exception_handler.rb`. Особо отметим пару вещей:
+* `set_todo` - это приватный метод контроллера (callback method), который ищет todo by id. Если запись не будет найдена в базе, ActiveRecord will throw an exception `ActiveRecord::RecordNotFound`. Мы защитимся от этой ошибки, вернув HTTP код `404`. Для этого создадим модуль `app/controllers/concerns/exception_handler.rb`. Особо отметим пару вещей:
    * в первую очередь, расширим его функцонал `extend ActiveSupport::Concern`, что даёт более graceful `included` метод
    * для защиты от exceptions используем метод `rescue_from`
    * подмечаем, что в `todos_controller.rb` используем `create!` вместо `create`, что может 
    вызвать `ActiveRecord::RecordInvalid`. А при наличии `exception_handler.rb` не надо лабать 
    вложенные `if..else` в контроллере. 
  
- Добавим concern-модули в `application_controller.rb`:
+Добавим concern-модули в `application_controller.rb`:
  
 ```ruby
 class ApplicationController < ActionController::API
@@ -348,18 +350,21 @@ $ curl -X DELETE localhost:3000/todos/1
 
 ### Todo items API
 
-Лабаем падающие тесты в `spec/requests/items_spec.rb`. 
-Затем пишем код в контроллере `items_controller.rb`. Несколько замечаний
-про код в контроллере:
+Лабаем падающие тесты в `spec/requests/items_spec.rb`.
+ 
+Затем пишем код в контроллере `items_controller.rb`. 
+
+Несколько замечаний про код в контроллере:
 
 * используются callbacks, внутри которых определяются переменные `@todo` и `@item`
 * причем, когда определяем `@item`:
- * запись ищется среди дел `@todo` с помощью метода `find_by!`, который raise `ActiveRecord::RecordNotFound`, если запись не будет найдена (если бы использовали метод `find_by`, то он вернул бы `nil` в этом случае) 
- * также используется условие `if @todo`
-* т.е. callback `set_todo_item` может либо вернуть `nil` (если нет данного списка дел), либо raise `ActiveRecord::RecordNotFound` (если нет среди дел данного списка искомого item-a)
+    * запись ищется среди дел `@todo` с помощью метода `find_by!`, который raise `ActiveRecord::RecordNotFound`, если запись не будет найдена (если бы использовали метод `find_by`, то он вернул бы `nil` в этом случае) 
+    * также используется условие `if @todo`
+    * т.е. callback `set_todo_item` может либо вернуть `nil` (если нет данного списка дел), либо raise `ActiveRecord::RecordNotFound` (если нет среди дел данного списка искомого item-a)
 * используем метод `head` - который возвращает ответ без контента, только заголовки
 
 Прогоняем тесты ещё раз - все проходят.
+
 Запускаем сервер `rails s` и в отдельном терминале проверяем API вручную:
 
 ```
