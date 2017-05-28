@@ -32,6 +32,17 @@
 
 # Part 1
 
+Первая часть охватывает моменты:
+
+* генерация Rails API приложения
+* Настройка RSpec и сопутствующих фреймворков: 
+    * FactoryGirl, 
+    * Database Cleaner, 
+    * Shoulda Matchers, 
+    * Faker
+* создание моделей и контроллеров путём TDD
+* ручная проверка с помощью ~~httpie~~ `curl`
+
 ## Intro
 
 Согласно [Rails 5 release notes](http://guides.rubyonrails.org/5_0_release_notes.html), генерация API only приложения:
@@ -399,6 +410,9 @@ curl localhost:3000/todos/2/items
 Git log:
 
 ```bash
+04ccb68: [2017-05-28 15:27:13 +0300] Заставляю дружить item.rb c Fabric Girl в контексте теста: 'если запись не существует:'.
+89b7b29: [2017-05-28 15:25:48 +0300] исправляю опечатки в items_spec.rb
+4f05894: [2017-05-28 15:25:31 +0300] Реализую код контроллера items_controller.rb - тесты зелёные.
 30b44e6: [2017-05-28 11:33:27 +0300] Написал тесты запросов в `items_spec.rb`.
 40c247a: [2017-05-28 06:41:27 +0300] rails_helper.rb: чистим лог перед каждым запуском какого-нибудь теста.
 8f47908: [2017-05-27 19:54:28 +0300] добавляю concerns-модули: ExceptionHandler и Responce, внедряю их в ApplicationController.
