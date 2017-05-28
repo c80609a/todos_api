@@ -315,4 +315,5 @@ $ curl -X DELETE localhost:3000/todos/1
 
 ## Todo items API
 
-Лабаем `spec/requests/items_spec.rb`. Коммит: 30b44e6.
+Лабаем падающие тесты в `spec/requests/items_spec.rb`. 
+Коммит: 30b44e69c7085247cfbf4f09062264415eb6d346.
