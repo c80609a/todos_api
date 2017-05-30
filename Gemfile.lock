@@ -77,6 +77,7 @@ GEM
       guard-compat (~> 1.1)
       zeus (~> 0)
     i18n (0.8.1)
+    jwt (1.5.6)
     listen (3.1.5)
       rb-fsevent (~> 0.9, >= 0.9.4)
       rb-inotify (~> 0.9, >= 0.9.7)
@@ -195,6 +196,7 @@ DEPENDENCIES
   guard
   guard-rspec
   guard-zeus
+  jwt
   listen (>= 3.0.5, < 3.2)
   puma (~> 3.7)
   rails (~> 5.1.1)
