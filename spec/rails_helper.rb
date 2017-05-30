@@ -85,6 +85,9 @@ RSpec.configure do |config|
     end
   end
 
-  config.include RequestSpecHelper, type: :request
+  # noinspection RubyResolve
+  config.include RequestSpecHelper#, type: :request
+  # noinspection RubyResolve
+  config.include ControllerSpecHelper
 
 end
