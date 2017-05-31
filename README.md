@@ -417,3 +417,663 @@ Git log:
 40c247a: [2017-05-28 06:41:27 +0300] rails_helper.rb: чистим лог перед каждым запуском какого-нибудь теста.
 8f47908: [2017-05-27 19:54:28 +0300] добавляю concerns-модули: ExceptionHandler и Responce, внедряю их в ApplicationController.
 ```
+
+# Part 2
+
+Вторая часть охватывает следующие темы:
+
+* 
+
+## Authentication
+
+В нашем приложении API подразумевает пользователей с доступом к только к своим ресурсам 
+(managing their own resources). 
+
+### Model User
+
+Создадим модель:
+
+```bash
+rails g model User name email password_digest
+rails db:migrate
+rails db:test:prepare
+```
+
+Обращаем внимание на `password_digest` (почему используем это поле вместо обычного `password`?) и двигаем далее -
+причина будет объяснена позднее.
+
+### Spec for User
+
+Лабаем `spec/models/user_spec.rb`:
+ 
+```ruby
+require 'rails_helper'
+
+RSpec.describe User, type: :model do
+
+  # Association test
+  # Убеждаемся, что User habtm Todos
+  it { should have_many(:todos) }
+
+  # Validation tests
+  # Убеждаемся, что запись обладает нужными свойствами перед тем
+  # как запишем их в базу
+  it { should validate_presence_of(:name) }
+  it { should validate_presence_of(:email) }
+  it { should validate_presence_of(:password_digest) }
+
+end
+```
+
+### Fabric for User
+
+Создаем фабрику `spec/factories/user.rb`:
+
+```ruby
+FactoryGirl.define do
+  factory :user do
+    name { Faker::Name.name }
+    email 'foo@bar.com'
+    password 'foobar'
+  end
+end
+```
+
+Прогоняем новые тесты - все упали. 
+
+### Model User implementing
+
+Имплементируем код модели.
+ 
+```ruby
+class User < ApplicationRecord
+  has_secure_password
+  has_many :todos, :dependent => :destroy, :foreign_key => :created_by
+  validates_presence_of :name, :email, :password_digest
+end
+```
+
+Обращаем внимание на пару моментов:
+
+* `has_secure_password` ([api.rubyonrails.org](http://api.rubyonrails.org/classes/ActiveModel/SecurePassword/ClassMethods.html)):
+> Встраивает парольную защиту, основанную на BCrypt.
+> Добавляет валидации в модель: 
+> 1) пароль должен присутствовать при создании записи; 
+> 2) длина пароля не должна превышать 72 символа;
+> 3) добавляется подтверждение пароля с помощью атрибута `password_confirmation`
+
+### Gem `bcrypt` comes on
+
+Чтобы он заработал, добавляем в Gemfile библиотеку `bcrypt`:
+
+```ruby
+gem 'bcrypt', '~> 3.1.7'
+```
+
+* `:foreign_key => :created_by` ([api.rubyonrails.org](http://api.rubyonrails.org/classes/ActiveRecord/Associations/ClassMethods.html#method-i-belongs_to-label-Options), [www.w3schools.com](https://www.w3schools.com/sql/sql_foreignkey.asp)):
+> FOREIGN KEY - это ключ, используемый для связи двух таблиц.
+> Это поле (или несколько полей) одной таблицы, которые ссылаются на PRIMARY KEY поле другой таблицы.
+> Таблица, содержащая FOREIGN KEY, называется дочерней таблицей, а таблица, на которую ссылаются
+> её поля - родительской таблицей.
+> С помощью опции `:foreign_key` можно определить имя поля, которое будет использоваться в ассоциации, как FOREIGN KEY.
+
+Делаем `bundle` и запускаем тесты ещё раз - всё зелёное.
+
+Git log:
+
+```
+bc926c2: [2017-05-29 20:57:11 +0300] Добавил модель User, добавил тесты для неё, связал с моделью Todo, подключил gem 'bcrypt', добавил фабрику.
+```
+
+Можно создавать пользователей с защищёнными паролями. 
+
+## Next steps
+
+Теперь мы прикрутим (wire up) оставшиеся части authentication system:
+
+* JsonWebToken - Encode and decode jwt tokens
+* AuthorizeApiRequest - Authorize each API request
+* AuthenticateUser - Authenticate users
+* AuthenticationController - Orchestrate authentication process
+
+## JSON web token
+
+Для начала ответим на вопрос - что это такое - [token based authentication](https://stackoverflow.com/questions/1592534/what-is-token-based-authentication):
+
+> Всё очень просто. 
+> Позволяем пользователю ввести логин/пароль
+> и в ответ даём ему *time-limited token*, который открывает
+> ему временный доступ к закрытым ресурсам по этому token-у и уже без 
+> использования логина/пароля.
+
+Добавляем в Gemfile `gem 'jwt'` и делаем `bundle`.
+
+Наш класс будет жить в `lib` директории. Но, надо помнить одну вещь:
+
+> As of Rails 5, [autoloading is disabled in production](http://edgeguides.rubyonrails.org/upgrading_ruby_on_rails.html#autoloading-is-disabled-after-booting-in-the-production-environment) because of thread safety.
+
+Для нас это вопрос, требущий решения, т.к. `lib` - это часть auto load paths.
+
+```bash
+$ mkdir app/lib
+$ touch app/lib/json_web_token.rb
+```
+
+И определим в новом файле jwt singleton:
+
+```ruby
+class JsonWebToken
+
+  # определим секрет для кодирования/декодирования токена
+  HMAC_SECRET = Rails.application.secrets.secret_key_base
+
+  def self.encode(payload, exp = 24.hours.from_now)
+    # установим крайний срок
+    payload[:exp] = exp.to_i
+    # подпишем token секретом
+    JWT.encode(payload, HMAC_SECRET)
+  end
+
+  def self.decode(token)
+    body = JWT.decode(token, HMAC_SECRET)[0]
+    HashWithIndifferentAccess.new body
+  # защитимся от возможных исключительных ситуаций 
+  rescue JWT::ExpiredSignature, JWT::VerificationError => e
+    # вызовем кастомное исключение, которая будет обработана кастомным обработчиком
+    raise ExceptionHandler::ExpiredSignature, e.message
+  end
+
+end
+```
+
+Этот singleton оборачивает (wraps) `JWT`, предоставляя методы по кодированию/декодированию token-ов.
+`encode` метод создаёт tokens на основе `payload` (user id) и на основе expiration period.
+Каждое Rails приложение имеет свой уникальный secret, и мы используем его для подписи этого token-а.
+
+`decode` метод работает в обратную сторону, используя Rails application's secret. Если
+декодирование провалится (либо по причиние истечения срока, либо token невалидный), `JWT` вызовет
+соответствующее исключение, которое обработаем модулем `ExceptionHandler`, код которого
+выглядит так (с учётом того, что там уже был код, и он изменился):
+
+```ruby
+module ExceptionHandler
+  extend ActiveSupport::Concern
+
+  # Define custom error subclasses - rescue catches `StandardErrors`
+  class AuthenticationError < StandardError; end
+  class MissingToken < StandardError; end
+  class InvalidToken < StandardError; end
+
+  included do
+    # Define custom handlers
+    rescue_from ActiveRecord::RecordInvalid, with: :four_twenty_two
+    rescue_from ExceptionHandler::AuthenticationError, with: :unauthorized_request
+    rescue_from ExceptionHandler::MissingToken, with: :four_twenty_two
+    rescue_from ExceptionHandler::InvalidToken, with: :four_twenty_two
+
+    rescue_from ActiveRecord::RecordNotFound do |e|
+      json_response({ message: e.message }, :not_found)
+    end
+  end
+
+  private
+
+  # JSON response with message; Status code 422 - unprocessable entity
+  def four_twenty_two(e)
+    json_response({ message: e.message }, :unprocessable_entity)
+  end
+
+  # JSON response with message; Status code 401 - Unauthorized
+  def unauthorized_request(e)
+    json_response({ message: e.message }, :unauthorized)
+  end
+end
+```
+
+В этом модуле мы определяем кастомные `StandardError` подклассы, которые помогут перехватывать 
+исключения. Определив эти кастомные подклассы, мы теперь можем написать `rescue_from` them once raised.
+
+Git log:
+
+```
+96c867c: [2017-05-30 06:58:58 +0300] Добавил код в модуль ExceptionHanlder, который спасает от исклю- чительных ситуаций с помощью внутренних подкл
+0224dc2: [2017-05-30 06:26:43 +0300] Подключил `gem 'jwt'`.
+d557a18: [2017-05-30 06:26:23 +0300] Добавил класс `lib/json_web_token.rb`.
+```
+
+## Authorize Api Request
+
+Напишем класс, который будет в ответе за авторизацию всех API запросов, и который будет 
+проверять, что все поступающие запросы имеют правильный token и id пользователя 
+(This class will be responsible for authorizing all API requests making sure that all 
+requests have a valid token and user payload).
+
+Т.к. это auth service class, то он будет жить в `app/auth`:
+
+```bash
+# создаём файл для класса
+$ mkdir app/auth
+$ touch app/auth/authorize_api_request.rb
+
+# создаем файл с тестами
+$ mkdir spec/auth
+$ touch spec/auth/authorize_api_request_spec.rb
+```
+
+## Spec for AuthorizeApiRequest
+
+Начнём с определения спецификации `spec/auth/authorize_api_request_spec.rb`:
+
+```ruby
+require 'rails_helper'
+
+RSpec.describe AuthorizeApiRequest do
+
+  # создаём тестового пользователя
+  let(:user) {create(:user)}
+
+  # подделываем 'Authorization' заголовок
+  # noinspection RubyStringKeysInHashInspection
+  let(:header) {{'Authorization' => token_generator(user.id)}}
+
+  # Invalid request subject
+  subject(:invalid_request_obj) {described_class.new({})}
+
+  # Valid request subject
+  subject(:request_obj) {described_class.new(header)}
+
+  # Тест для AuthorizeApiRequest#call
+  # это единственная точка входа в этот service class
+  describe '#call' do
+
+    # вернёт user object, если запрос валидный
+    context 'when valid request:' do
+      it 'returns user object' do
+        result = request_obj.call
+        expect(result[:user]).to eq(user)
+      end
+    end
+
+    # вернёт сообщение об ошибке, если запрос невалидный
+    context 'when invalid request:' do
+      
+      context 'with missing token:' do
+        it 'raises a MissingToken error' do
+          expect do
+            invalid_request_obj.call
+          end.to raise_error(ExceptionHandler::MissingToken, 'Missing token')
+        end
+      end
+
+      context 'when invalid token:' do
+        subject(:invalid_request_obj) do
+          described_class.new('Authorization' => token_generator(5))
+        end
+
+        it 'raises an InvalidToken error' do
+          expect do
+            invalid_request_obj.call
+          end.to raise_error(ExceptionHandler::InvalidToken, /Invalid token/)
+
+        end
+
+      end
+
+      context 'when token is expired:' do
+        # noinspection RubyStringKeysInHashInspection
+        let(:header) {{'Authorization' => expired_token_generator(user.id)}}
+        subject(:request_obj) {described_class.new(header)}
+
+        it 'raises ExpiresSignature error' do
+          expect do
+            request_obj.call
+          end.to raise_error(ExceptionHandler::InvalidToken, /Signature has expired/)
+        end
+        
+      end#context
+      
+    end#context
+
+  end#describe#call
+
+end#describe
+```
+
+`AuthorizeApiRequest` service должен быть оснащён единственным методом
+`call` который вернёт объект класса User, если всё в порядке, или
+будет вызвано исключение в обратном случае.
+
+Обращаем внимание на то, что spec использует пару вспомогательных методов:
+
+* `token_generator` - генерирует test token
+* `expired_token_generator` - генерирует expired token
+
+Имплементируем их в `spec/support`:
+
+```bash
+$ touch spec/support/controller_spec_helper.rb
+```
+
+```ruby
+module ControllerSpecHelper
+
+  # генерируем token из user id
+  def token_generator(user_id)
+    JsonWebToken.encode(user_id: user_id)
+  end
+
+  # генерируем просроченный token
+  def expired_token_generator(user_id)
+    JsonWebToken.encode({user_id: user_id}, (Time.now.to_i - 10))
+  end
+
+  # вернёт валидные headers
+  # noinspection RubyStringKeysInHashInspection
+  def valid_headers
+    {
+        'Authorization' => token_generator(user.id),
+        'Content-Type' => 'application/json'
+    }
+  end
+
+  # вернёт неправильные заголовки
+  # noinspection RubyStringKeysInHashInspection
+  def invalid_headers
+    {
+        'Authorization' => nil,
+        'Content-Type' => 'application/json'
+    }
+  end
+  
+end
+```
+
+Обращаем внимание на то, что заведены еще два вспомогательных метода: 
+`valid_headers` и `invalid_headers`. Чтобы методами этого модуля можно
+было воспользоваться, его нужно include в `rails_helper.rb`.
+
+Пока мы в `rails_helper.rb`, заодно уберём `type: :request` при включении
+`RequestSpecHelper` - т.е. сделаем так, чтобы этот модуль был доступен
+всем типам тестов:
+
+```ruby
+RSpec.configure do |config|
+  # [...]
+  # previously `config.include RequestSpecHelper, type: :request`
+  config.include RequestSpecHelper
+  config.include ControllerSpecHelper
+  # [...]
+end
+```
+
+Запускаем все тесты - падают только 4 новых.
+
+Git log:
+
+```
+ea569e4: [2017-05-30 11:59:35 +0300] Добавил опцию `:optional => true` в ассоциацию `belongs_to` класса Todo.
+3d13284: [2017-05-30 11:58:51 +0300] 1) Добавил тесты `authorize_api_request_spec.rb`; 2) Добавил `controller_spec_helper.rb`; 3) включил `controll
+```
+
+## AuthorizeApiRequest model implementing
+
+Теперь займёмся кодом модели `app/auth/authorize_api_request.rb`:
+
+```ruby
+class AuthorizeApiRequest
+
+  def initialize(headers = {})
+    @headers = headers
+  end
+
+  # Service entry point - вернёт валидный user object
+  def call
+    {
+        user: user
+    }
+  end
+
+  private
+
+  attr_reader :headers
+
+  def user
+    # проверяем наличие пользователя в базе данных
+    # memoize user object
+    @user ||= User.find(decoded_auth_token[:user_id]) if decoded_auth_token
+  # handle "user not found"
+  rescue ActiveRecord::RecordNotFound => e
+    # raise custom error
+    raise(
+        ExceptionHandler::InvalidToken,
+        ("#{Message.invalid_token} #{e.message}")
+    )
+  end
+
+  # decode auth token
+  def decoded_auth_token
+    @decoded_auth_token ||= JsonWebToken.decode(http_auth_header)
+  end
+  
+  # check for token in `Authorization` header
+  def http_auth_header
+    if headers['Authorization'].present?
+      return headers['Authorization'].split(' ').last
+    end
+    raise(ExceptionHandler::MissingToken, Message.missing_token)
+  end
+
+end
+```
+
+Сервис `AuthorizeApiRequest` извлекает token из заголовков авторизации,
+пытается декодировать его и вернуть правильный user объект. 
+
+Помимо этого присутствует еще один singleton класс `Message`, 
+в котором живут все сообщения. Определим его в директории `app/lib`,
+т.к. он не domain-specific.
+
+Прогоняем все тесты `zeus test spec -fd`: passed.
+
+Git log:
+
+```
+b32d6bf: [2017-05-30 14:01:17 +0300] Добавил недостающий ExceptionHandler::ExpiredSignature класс.
+061a746: [2017-05-30 14:00:27 +0300] Добавил класс Message.
+63aa1ed: [2017-05-30 14:00:08 +0300] Имплементировал `authorize_api_request.rb`.
+```
+
+## Authenticate User
+
+Этот класс будет отвечать за авторизацию пользователей с помощью пары email/password.
+
+```bash
+$ touch app/auth/authenticate_user.rb
+$ touch spec/auth/authenticate_user_spec.rb
+```
+
+Начнём со спецификации:
+
+```ruby
+require 'rails_helper'
+
+RSpec.describe AuthenticateUser do
+  # create test user
+  let(:user) { create(:user) }
+  # valid request subject
+  subject(:valid_auth_obj) { described_class.new(user.email, user.password) }
+  # invalid request subject
+  subject(:invalid_auth_obj) { described_class.new('foo', 'bar') }
+
+  # test suite for AuthenticateUser#call
+  describe '#call' do
+    
+    # returns token when valid request
+    context 'when valid credentials' do
+      it 'returns an auth token' do
+        token = valid_auth_obj.call
+        expect(token).not_to be_nil
+      end
+    end#context
+    
+    # raises Authentication Error when invalid request
+    context 'when invalid credentials' do
+      it 'raises authentication error' do
+        token = invalid_auth_obj.call
+        expect(token).to raise_error(ExceptionHandler::AuthenticationError, /Invalid credentials/)
+      end
+    end#context
+    
+  end#describe
+  
+end
+```
+
+Сервис `AuthenticateUser` также имеет единственную entry point в виде метода `#call`. 
+Метод должен вернуть token, если email/password от пользователя пришли правильные.
+В противном случае - вызовется ошибка авторизации.
+
+Прогоняем тесты, они упали. Займёмся имплементацией кода `app/auth/authenticate_user.rb`:
+
+```ruby
+class AuthenticateUser
+  
+  def initialize(email, password)
+    @email = email
+    @password = password
+  end
+  
+  def call
+    JsonWebToken.encode(user_id: user.id) if user
+  end
+  
+  private
+  
+  attr_reader :email, :password
+  
+  # verify user credentials
+  def user
+    user = User.find_by(email: email)
+    return user if user && user.authenticate(password)
+    # raise Authentication Error if credentials are invalid
+    raise(ExceptionHandler::AuthenticationError, Message.invalid_credentials)
+  end
+  
+end
+```
+
+Сервис `AuthenticateUser` принимает email/password и выдаёт token, если всё в порядке.
+
+Запускаем тесты - все проходят.
+
+Git log:
+
+```
+5b07548: [2017-05-30 18:08:53 +0300] Добавил сервис `authenticate_user.rb`.
+609c2da: [2017-05-30 18:08:18 +0300] Добавил тесты `authenticate_user_spec.rb`.
+```
+
+## Authentication Controller
+
+Этот контроллер будет управлять сервисом авторизации, который мы только-что создали.
+
+```bash
+$ rails g controller Authentication
+```
+
+Начнём с тестов `spec/requests/authentication_controller_spec.rb`:
+
+```ruby
+require 'rails_helper'
+
+RSpec.describe AuthenticationController, type: :controller do
+  
+  describe 'POST /auth/login' do
+
+    # <editor-fold desc="# создаём тестовые данные">
+    # создаём тестового пользователя
+    let!(:user) { create(:user) }
+    # устанавливаем заголовки для авторизации
+    let(:headers) { valid_headers.except('Authorization') }
+    # задаём правильные и неправильные credentials
+    let(:valid_credentials) do
+      {
+          email: user.email,
+          password: user.password
+      }.to_json
+    end
+    let(:invalid_credentials) do
+      {
+          email: Faker::Internet.email,
+          password: Faker::Internet.password
+      }.to_json
+    end
+
+    # set request.headers to our custom headers
+    # before { allow(request).to receive(:headers).and_return(headers) }
+    # </editor-fold>
+    
+    context 'Когда запрос валидный:' do
+      before { post '/auth/login', params: valid_credentials, headers: headers }
+      
+      it 'вернётся authentication token' do
+        expect(json['auth_token']).not_to be_nil
+      end
+      
+    end
+    
+    context 'Когда запрос невалидный:' do
+      before { post '/auth/login', params: invalid_credentials, headers: headers }
+      
+      it 'вернётся failure message' do
+        expect(json['message']).to match(/Invalid credentials/)
+      end
+      
+    end
+    
+  end
+  
+end
+```
+
+Контроллер доступен по маршруту `/auth/login`: принимает на вход user credentials
+и отвечает JSON-ом.
+
+```
+class AuthenticationController < ApplicationController
+
+  def authenticate
+    auth_token = AuthenticateUser.new(auth_params[:email], auth_params[:password]).call
+    json_response(auth_token: auth_token)
+  end
+
+  private
+
+  def auth_params
+    params.permit(:email, :password)
+  end
+
+end
+```
+
+Добавим маршрут в `config/routes.rb`:
+
+```
+# config/routes.rb
+Rails.application.routes.draw do
+  # [...]
+  post 'auth/login', to: 'authentication#authenticate'
+end
+```
+
+Запускаем тесты - все прошли.
+
+Git log:
+
+```
+1829faa: [2017-05-31 11:30:56 +0300] Добавил контроллер `authentication_controller.rb` + маршрут.
+cd733e7: [2017-05-31 11:24:49 +0300] Добавил тесты `spec/requests/authentication_controller_spec.rb`.
+```
+
+## User Controller
+
